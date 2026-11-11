@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON STRIKE // Cyberpunk 2D Shooter</title>
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS for P2P Multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- FontAwesome for UI Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap');
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050508;
+            color: #e2e8f0;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Neon Glow Effects */
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.6), inset 0 0 10px rgba(6, 182, 212, 0.4);
+            border: 1px solid rgba(6, 182, 212, 0.8);
+        }
+
+        .glow-magenta {
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.6), inset 0 0 10px rgba(236, 72, 153, 0.4);
+            border: 1px solid rgba(236, 72, 153, 0.8);
+        }
+
+        .text-glow-cyan {
+            text-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
+        }
+
+        .text-glow-magenta {
+            text-shadow: 0 0 8px rgba(236, 72, 153, 0.8);
+        }
+
+        /* Scanline Overlay */
+        .scanlines {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            ), linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.03),
+                rgba(0, 255, 0, 0.01),
+                rgba(0, 0, 255, 0.03)
+            );
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        /* Custom Scrollbar for HUD list */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #06b6d4;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="relative flex flex-col items-center justify-center min-h-screen">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- CRT Scanline Effect Layer -->
+    <div class="scanlines absolute inset-0 z-10"></div>
+
+    <!-- HUD Overlay (Visible during gameplay) -->
+    <div id="hud" class="absolute inset-0 z-20 pointer-events-none hidden flex flex-col justify-between p-4 md:p-6">
+        
+        <!-- Top HUD Bar -->
+        <div class="flex justify-between items-start">
+            <!-- Health & Ammo Stats -->
+            <div class="flex flex-col gap-2 w-64 md:w-80 pointer-events-auto bg-slate-900/80 backdrop-blur-md p-3 rounded-lg border border-cyan-500/30 glow-cyan">
+                <div class="flex items-center justify-between">
+                    <span class="font-orbitron text-xs text-cyan-400 tracking-wider">HEALTH</span>
+                    <span id="healthText" class="font-orbitron text-sm font-bold text-cyan-300">100 / 100</span>
+                </div>
+                <!-- Health Bar -->
+                <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-cyan-500/40 p-0.5">
+                    <div id="healthBar" class="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-150" style="width: 100%;"></div>
+                </div>
+
+                <!-- Weapon Slot Indicator -->
+                <div class="mt-1 flex items-center justify-between text-xs font-orbitron">
+                    <span class="text-slate-400">WEAPON [1-3]</span>
+                    <span id="weaponName" class="text-pink-400 font-bold uppercase tracking-widest text-glow-magenta">PISTOL</span>
+                </div>
+                <!-- Ammo Bar / Cooldown -->
+                <div class="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-pink-500/30">
+                    <div id="ammoBar" class="h-full bg-pink-500 transition-all duration-75" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- Match Timer & Server Status -->
+            <div class="flex flex-col items-center bg-slate-900/80 backdrop-blur-md px-5 py-2 rounded-lg border border-cyan-500/30">
+                <div class="text-xs font-orbitron text-slate-400">ROOM ID</div>
+                <div id="hudRoomId" class="text-xs font-bold font-orbitron text-cyan-400 tracking-wider flex items-center gap-2">
+                    <span>SOLO</span>
+                    <button id="copyRoomBtn" class="pointer-events-auto hover:text-white transition text-slate-400" title="Copy Room ID">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Leaderboard Mini HUD -->
+            <div class="w-56 md:w-64 bg-slate-900/80 backdrop-blur-md p-3 rounded-lg border border-cyan-500/30 glow-cyan">
+                <div class="font-orbitron text-xs text-cyan-400 font-bold tracking-wider mb-2 border-b border-slate-700/60 pb-1 flex justify-between">
+                    <span>LEADERBOARD</span>
+                    <span class="text-pink-400">K / D</span>
+                </div>
+                <div id="leaderboardList" class="space-y-1 text-xs max-h-32 overflow-y-auto">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Weapon Hotbar Bottom HUD -->
+        <div class="flex justify-center items-end gap-3 pointer-events-auto mb-2">
+            <div id="slot-1" class="weapon-slot px-4 py-2 bg-slate-900/90 border border-cyan-500 rounded-lg text-center font-orbitron cursor-pointer transition glow-cyan">
+                <div class="text-[10px] text-cyan-400">1</div>
+                <div class="text-xs font-bold text-white">PISTOL</div>
+            </div>
+            <div id="slot-2" class="weapon-slot px-4 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-center font-orbitron cursor-pointer transition">
+                <div class="text-[10px] text-slate-500">2</div>
+                <div class="text-xs font-bold text-slate-300">SHOTGUN</div>
+            </div>
+            <div id="slot-3" class="weapon-slot px-4 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-center font-orbitron cursor-pointer transition">
+                <div class="text-[10px] text-slate-500">3</div>
+                <div class="text-xs font-bold text-slate-300">RIFLE</div>
+            </div>
+        </div>
+
+        <!-- Mobile Touch Controls (Automatically visible on touch devices) -->
+        <div id="mobileControls" class="pointer-events-auto md:hidden flex justify-between items-end w-full px-2 pb-2">
+            <!-- Left Movement Joystick Area -->
+            <div id="joystickMove" class="w-28 h-28 bg-slate-900/60 rounded-full border border-cyan-500/40 relative flex items-center justify-center">
+                <div id="joystickMoveKnob" class="w-10 h-10 bg-cyan-500/80 rounded-full shadow-lg border border-white"></div>
+            </div>
+            <!-- Right Fire Button -->
+            <button id="btnMobileFire" class="w-20 h-20 bg-pink-600/80 active:bg-pink-500 rounded-full border-2 border-pink-400 flex items-center justify-center text-white font-orbitron font-bold text-sm shadow-lg glow-magenta">
+                FIRE
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Menu Modal -->
+    <div id="mainMenu" class="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
+        <div class="max-w-md w-full bg-slate-900/90 border border-cyan-500/50 rounded-2xl p-6 md:p-8 glow-cyan flex flex-col gap-6 relative overflow-hidden">
+            
+            <!-- Neon Header Decorative Lines -->
+            <div class="absolute -top-12 -right-12 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+            <div class="absolute -bottom-12 -left-12 w-32 h-32 bg-pink-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div class="text-center">
+                <h1 class="font-orbitron text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-pink-500 tracking-wider">
+                    NEON STRIKE
+                </h1>
+                <p class="text-xs font-orbitron text-cyan-400/80 tracking-widest mt-1">CYBERPUNK TOP-DOWN ARENA</p>
+            </div>
+
+            <!-- Player Profile Setup -->
+            <div class="space-y-2">
+                <label class="block text-xs font-orbitron text-slate-300">PLAYER NAME</label>
+                <input id="inputPlayerName" type="text" maxlength="12" placeholder="CyberNinja" 
+                       class="w-full bg-slate-950 border border-cyan-500/40 rounded-lg px-4 py-2.5 text-cyan-300 font-orbitron focus:outline-none focus:border-cyan-400 transition">
+            </div>
+
+            <!-- Game Mode Options -->
+            <div class="space-y-3">
+                <button id="btnSolo" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-teal-500 hover:from-cyan-500 hover:to-teal-400 text-slate-950 font-orbitron font-bold rounded-lg transition shadow-lg flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-robot"></i> PRACTICE VS BOTS
+                </button>
+
+                <div class="flex items-center gap-2 my-2">
+                    <div class="h-px bg-slate-800 flex-1"></div>
+                    <span class="text-xs font-orbitron text-slate-500">OR MULTIPLAYER</span>
+                    <div class="h-px bg-slate-800 flex-1"></div>
+                </div>
+
+                <button id="btnHost" class="w-full py-3 bg-slate-950 hover:bg-slate-900 border border-pink-500/60 text-pink-400 hover:text-pink-300 font-orbitron font-bold rounded-lg transition glow-magenta flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-server"></i> CREATE ROOM (HOST)
+                </button>
+
+                <div class="flex gap-2">
+                    <input id="inputRoomCode" type="text" placeholder="ROOM CODE" 
+                           class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-orbitron text-cyan-300 uppercase focus:outline-none focus:border-cyan-500">
+                    <button id="btnJoin" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 border border-cyan-500/40 text-cyan-400 font-orbitron text-xs font-bold rounded-lg transition">
+                        JOIN
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bot Controls Count -->
+            <div class="flex justify-between items-center bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                <span class="text-xs font-orbitron text-slate-400">AI BOTS COUNT</span>
+                <div class="flex items-center gap-3">
+                    <button id="btnBotMinus" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 rounded text-cyan-400 font-bold">-</button>
+                    <span id="botCountText" class="text-xs font-orbitron font-bold text-white">4</span>
+                    <button id="btnBotPlus" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 rounded text-cyan-400 font-bold">+</button>
+                </div>
+            </div>
+
+            <!-- Sound Toggle -->
+            <div class="flex justify-between items-center text-xs font-orbitron text-slate-400">
+                <span>AUDIO SYNTHESIZER</span>
+                <button id="btnAudioToggle" class="text-cyan-400 hover:text-cyan-300 transition">
+                    <i class="fa-solid fa-volume-high text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Death / Respawn Overlay -->
+    <div id="deathOverlay" class="absolute inset-0 z-25 bg-red-950/80 backdrop-blur-sm hidden flex flex-col items-center justify-center pointer-events-auto">
+        <h2 class="font-orbitron text-5xl font-black text-red-500 tracking-widest text-shadow mb-2 animate-pulse">SYSTEM FAILURE</h2>
+        <p class="font-orbitron text-sm text-slate-300 mb-6">YOU WERE ELIMINATED</p>
+        <button id="btnRespawn" class="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-orbitron font-bold rounded-lg glow-magenta transition">
+            RESPAWN NOW
+        </button>
+    </div>
+
+    <!-- JavaScript Game Logic -->
+    <script>
+        /**
+         * NEON STRIKE - Top-Down 2D Multiplayer Shooter
+         * Features: HTML5 Canvas, Web Audio Synthesizer, PeerJS WebRTC P2P Multiplayer,
+         * AI Bot pathfinding/shooting, custom weapons, neon visual particle system.
+         */
+
+        // --- GLOBAL CONSTANTS & CONFIG ---
+        const WORLD = { width: 2400, height: 2400 };
+        const WEAPONS = {
+            pistol: { name: 'Pistol', fireRate: 250, damage: 22, speed: 14, spread: 0.05, count: 1, range: 750, color: '#06b6d4', size: 4 },
+            shotgun: { name: 'Shotgun', fireRate: 750, damage: 14, speed: 12, spread: 0.22, count: 6, range: 450, color: '#f59e0b', size: 3 },
+            rifle: { name: 'Rifle', fireRate: 110, damage: 15, speed: 18, spread: 0.08, count: 1, range: 900, color: '#ec4899', size: 3 }
+        };
+
+        // --- AUDIO SYNTHESIZER (Web Audio API) ---
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) this.ctx = new AudioContext();
+                }
+            }
+
+            playShoot(type) {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+                if (type === 'shotgun') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'rifle') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(60, now + 0.08);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else { // Pistol
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(80, now + 0.1);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                }
+            }
+
+            playHit() {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                const now = this.ctx.currentTime;
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.05);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            }
+
+            playExplosion() {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                const now = this.ctx.currentTime;
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(20, now + 0.3);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+        const sfx = new SoundFX();
+
+        // --- MAP OBSTACLES (Sci-Fi Walls) ---
+        const walls = [
+            // Boundary walls
+            { x: 0, y: 0, w: WORLD.width, h: 40 },
+            { x: 0, y: WORLD.height - 40, w: WORLD.width, h: 40 },
+            { x: 0, y: 0, w: 40, h: WORLD.height },
+            { x: WORLD.width - 40, y: 0, w: 40, h: WORLD.height },
+
+            // Center Complex
+            { x: 1000, y: 1000, w: 400, h: 60 },
+            { x: 1000, y: 1340, w: 400, h: 60 },
+            { x: 1000, y: 1060, w: 60, h: 280 },
+            { x: 1340, y: 1060, w: 60, h: 280 },
+
+            // Inner Cover Boxes
+            { x: 400, y: 400, w: 250, h: 80 },
+            { x: 400, y: 650, w: 80, h: 250 },
+            { x: 1750, y: 400, w: 250, h: 80 },
+            { x: 1920, y: 650, w: 80, h: 250 },
+
+            { x: 400, y: 1800, w: 250, h: 80 },
+            { x: 400, y: 1500, w: 80, h: 250 },
+            { x: 1750, y: 1800, w: 250, h: 80 },
+            { x: 1920, y: 1500, w: 80, h: 250 },
+
+            // Pillars
+            { x: 800, y: 700, w: 100, h: 100 },
+            { x: 1500, y: 700, w: 100, h: 100 },
+            { x: 800, y: 1600, w: 100, h: 100 },
+            { x: 1500, y: 1600, w: 100, h: 100 },
+        ];
+
+        // Dedicated predefined open spawn locations across the map
+        const SPAWN_POINTS = [
+            { x: 200, y: 200 }, { x: 1200, y: 200 }, { x: 2200, y: 200 },
+            { x: 200, y: 1200 }, { x: 700, y: 1200 }, { x: 1700, y: 1200 }, { x: 2200, y: 1200 },
+            { x: 200, y: 2200 }, { x: 1200, y: 2200 }, { x: 2200, y: 2200 },
+            { x: 700, y: 400 }, { x: 1700, y: 400 }, { x: 700, y: 2000 }, { x: 1700, y: 2000 }
+        ];
+
+        // --- GAME ENGINE STATE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let camera = { x: 0, y: 0 };
+        let localPlayer = null;
+        let players = new Map(); // id -> Player object
+        let bullets = [];
+        let particles = [];
+        let botCount = 4;
+        let isHost = false;
+        let peer = null;
+        let peerConnections = new Map();
+        let lastFrameTime = performance.now();
+
+        // Input state
+        const keys = { w: false, a: false, s: false, d: false };
+        const mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
+        let touchMoveDir = { x: 0, y: 0 };
+        let isTouchDevice = false;
+
+        // --- PLAYER CLASS ---
+        class Player {
+            constructor(id, name, x, y, isBot = false) {
+                this.id = id;
+                this.name = name || 'CyberAgent';
+                this.x = x;
+                this.y = y;
+                this.radius = 20;
+                this.speed = 4.5;
+                this.angle = 0;
+                this.health = 100;
+                this.maxHealth = 100;
+                this.kills = 0;
+                this.deaths = 0;
+                this.isBot = isBot;
+                this.isDead = false;
+                this.selectedWeapon = 'pistol';
+                this.lastShotTime = 0;
+                this.color = isBot ? '#f43f5e' : (id === localPlayer?.id ? '#06b6d4' : '#a855f7');
+                
+                // Bot AI state
+                this.botTarget = null;
+                this.botChangeDirTime = 0;
+                this.botMoveAngle = Math.random() * Math.PI * 2;
+            }
+
+            update(dt) {
+                if (this.isDead) return;
+
+                if (this.isBot && isHost) {
+                    this.updateAI(dt);
+                }
+
+                // Keep inside world bounds
+                this.x = Math.max(this.radius + 40, Math.min(WORLD.width - this.radius - 40, this.x));
+                this.y = Math.max(this.radius + 40, Math.min(WORLD.height - this.radius - 40, this.y));
+            }
+
+            move(dx, dy) {
+                if (this.isDead) return;
+                let nextX = this.x + dx * this.speed;
+                let nextY = this.y + dy * this.speed;
+
+                // Wall Collision Check (Horizontal & Vertical separated for smooth gliding)
+                if (!checkWallCollision(nextX, this.y, this.radius)) {
+                    this.x = nextX;
+                }
+                if (!checkWallCollision(this.x, nextY, this.radius)) {
+                    this.y = nextY;
+                }
+            }
+
+            shoot() {
+                if (this.isDead) return;
+                const now = performance.now();
+                const weapon = WEAPONS[this.selectedWeapon];
+                if (now - this.lastShotTime < weapon.fireRate) return;
+
+                this.lastShotTime = now;
+                sfx.playShoot(this.selectedWeapon);
+
+                for (let i = 0; i < weapon.count; i++) {
+                    const spreadAngle = (Math.random() - 0.5) * weapon.spread;
+                    const finalAngle = this.angle + spreadAngle;
+
+                    const bullet = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        ownerId: this.id,
+                        x: this.x + Math.cos(this.angle) * (this.radius + 5),
+                        y: this.y + Math.sin(this.angle) * (this.radius + 5),
+                        vx: Math.cos(finalAngle) * weapon.speed,
+                        vy: Math.sin(finalAngle) * weapon.speed,
+                        damage: weapon.damage,
+                        range: weapon.range,
+                        distanceTraveled: 0,
+                        color: weapon.color,
+                        size: weapon.size
+                    };
+                    bullets.push(bullet);
+
+                    // Create muzzle flash particles
+                    createMuzzleFlash(bullet.x, bullet.y, finalAngle, weapon.color);
+                }
+            }
+
+            updateAI(dt) {
+                const now = performance.now();
+                
+                // Find nearest player enemy
+                let nearestEnemy = null;
+                let minDist = Infinity;
+                players.forEach(p => {
+                    if (p.id !== this.id && !p.isDead) {
+                        const dist = Math.hypot(p.x - this.x, p.y - this.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearestEnemy = p;
+                        }
+                    }
+                });
+
+                let desiredAngle = this.botMoveAngle;
+                let shouldShoot = false;
+
+                if (nearestEnemy && minDist < 900) {
+                    // Aim at target
+                    const aimAngle = Math.atan2(nearestEnemy.y - this.y, nearestEnemy.x - this.x);
+                    this.angle = aimAngle;
+                    
+                    if (minDist > 250) {
+                        desiredAngle = aimAngle;
+                    } else {
+                        desiredAngle = aimAngle + Math.PI / 2; // Strafe
+                    }
+
+                    if (minDist < 650) {
+                        shouldShoot = true;
+                    }
+                } else {
+                    if (now > this.botChangeDirTime) {
+                        this.botMoveAngle += (Math.random() - 0.5) * 2.0;
+                        this.botChangeDirTime = now + 1500 + Math.random() * 2500;
+                    }
+                    desiredAngle = this.botMoveAngle;
+                    this.angle = desiredAngle;
+                }
+
+                // Obstacle Avoidance (Raycasting)
+                let finalMoveAngle = desiredAngle;
+                const checkDist = 55;
+                
+                // Check straight ahead
+                if (checkWallCollision(this.x + Math.cos(desiredAngle) * checkDist, this.y + Math.sin(desiredAngle) * checkDist, this.radius)) {
+                    // Try alternative angles (-90 to +90 degrees)
+                    const offsets = [Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI * 0.75, -Math.PI * 0.75];
+                    for (let offset of offsets) {
+                        const testAngle = desiredAngle + offset;
+                        if (!checkWallCollision(this.x + Math.cos(testAngle) * checkDist, this.y + Math.sin(testAngle) * checkDist, this.radius)) {
+                            finalMoveAngle = testAngle;
+                            this.botMoveAngle = testAngle; // Redirect bot wandering path
+                            break;
+                        }
+                    }
+                }
+
+                this.move(Math.cos(finalMoveAngle), Math.sin(finalMoveAngle));
+
+                if (shouldShoot) {
+                    this.shoot();
+                }
+            }
+
+            takeDamage(damage, attackerId) {
+                if (this.isDead) return;
+                this.health -= damage;
+                sfx.playHit();
+                
+                // Spawn hit blood/neon particles
+                createSparks(this.x, this.y, '#f43f5e', 8);
+
+                if (this.health <= 0) {
+                    this.health = 0;
+                    this.isDead = true;
+                    this.deaths++;
+                    sfx.playExplosion();
+                    createExplosion(this.x, this.y, this.color);
+
+                    const attacker = players.get(attackerId);
+                    if (attacker) attacker.kills++;
+
+                    if (this.id === localPlayer?.id) {
+                        document.getElementById('deathOverlay').classList.remove('hidden');
+                    }
+
+                    // Bot respawn timer
+                    if (this.isBot && isHost) {
+                        setTimeout(() => this.respawn(), 4000);
+                    }
+                }
+            }
+
+            respawn() {
+                this.health = this.maxHealth;
+                this.isDead = false;
+                const safeSpawn = getSafeSpawnPoint(this.radius);
+                this.x = safeSpawn.x;
+                this.y = safeSpawn.y;
+                if (this.id === localPlayer?.id) {
+                    document.getElementById('deathOverlay').classList.add('hidden');
+                }
+            }
+        }
+
+        // --- COLLISION DETECT ---
+        function checkWallCollision(x, y, radius) {
+            for (let wall of walls) {
+                let closestX = Math.max(wall.x, Math.min(x, wall.x + wall.w));
+                let closestY = Math.max(wall.y, Math.min(y, wall.y + wall.h));
+                let distanceX = x - closestX;
+                let distanceY = y - closestY;
+                let distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+                if (distanceSquared < (radius * radius)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Check if a position is completely clear of walls with safety margin
+        function isPositionClear(x, y, radius = 25) {
+            return !checkWallCollision(x, y, radius + 15);
+        }
+
+        // Get guaranteed safe spawn coordinates
+        function getSafeSpawnPoint(radius = 20) {
+            // First try predefined open spawn locations with extra padding
+            const shuffled = [...SPAWN_POINTS].sort(() => Math.random() - 0.5);
+            for (let p of shuffled) {
+                if (isPositionClear(p.x, p.y, radius)) {
+                    return { x: p.x, y: p.y };
+                }
+            }
+
+            // Fallback: random search with collision validation
+            for (let i = 0; i < 100; i++) {
+                let rx = 100 + Math.random() * (WORLD.width - 200);
+                let ry = 100 + Math.random() * (WORLD.height - 200);
+                if (isPositionClear(rx, ry, radius)) {
+                    return { x: rx, y: ry };
+                }
+            }
+
+            // Absolute fallback center clear corridor
+            return { x: 1200, y: 850 };
+        }
+
+        // --- PARTICLE SYSTEM ---
+        function createMuzzleFlash(x, y, angle, color) {
+            for (let i = 0; i < 4; i++) {
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle + (Math.random() - 0.5) * 0.4) * (2 + Math.random() * 3),
+                    vy: Math.sin(angle + (Math.random() - 0.5) * 0.4) * (2 + Math.random() * 3),
+                    life: 1.0,
+                    decay: 0.1,
+                    size: 2 + Math.random() * 2,
+                    color
+                });
+            }
+        }
+
+        function createSparks(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1 + Math.random() * 5;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1.0,
+                    decay: 0.05 + Math.random() * 0.05,
+                    size: 2 + Math.random() * 3,
+                    color
+                });
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            createSparks(x, y, color, 30);
+        }
+
+        // --- PARTICLE UPDATES ---
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.95; // Friction / Drag
+                p.vy *= 0.95;
+                p.life -= p.decay;
+
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // --- BULLETS SYSTEM ---
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                const dist = Math.hypot(b.vx, b.vy);
+                b.distanceTraveled += dist;
+
+                // Wall Collision Check
+                if (checkWallCollision(b.x, b.y, b.size)) {
+                    createSparks(b.x, b.y, b.color, 5);
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Range Check
+                if (b.distanceTraveled >= b.range) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Player Hit Check (Host handles authoritative damage for bots/players)
+                if (isHost || !peer) {
+                    players.forEach(player => {
+                        if (player.id !== b.ownerId && !player.isDead) {
+                            const hitDist = Math.hypot(player.x - b.x, player.y - b.y);
+                            if (hitDist < player.radius + b.size) {
+                                player.takeDamage(b.damage, b.ownerId);
+                                bullets.splice(i, 1);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        // --- RENDER GAME ---
+        function render() {
+            // Resize canvas to window
+            if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+
+            // Camera follow local player
+            if (localPlayer) {
+                camera.x = localPlayer.x - canvas.width / 2;
+                camera.y = localPlayer.y - canvas.height / 2;
+            }
+
+            // Clear Background
+            ctx.fillStyle = '#050508';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // Draw Grid Pattern
+            ctx.strokeStyle = 'rgba(6, 182, 212, 0.08)';
+            ctx.lineWidth = 1;
+            const gridSize = 100;
+            const startX = Math.floor(camera.x / gridSize) * gridSize;
+            const endX = startX + canvas.width + gridSize;
+            const startY = Math.floor(camera.y / gridSize) * gridSize;
+            const endY = startY + canvas.height + gridSize;
+
+            for (let x = startX; x < endX; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, startY);
+                ctx.lineTo(x, endY);
+                ctx.stroke();
+            }
+            for (let y = startY; y < endY; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(startX, y);
+                ctx.lineTo(endX, y);
+                ctx.stroke();
+            }
+
+            // Draw Walls
+            walls.forEach(wall => {
+                // Wall Base
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+
+                // Neon Edges
+                ctx.strokeStyle = '#06b6d4';
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#06b6d4';
+                ctx.shadowBlur = 8;
+                ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+                ctx.shadowBlur = 0;
+            });
+
+            // Draw Particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // Draw Bullets
+            bullets.forEach(b => {
+                ctx.fillStyle = b.color;
+                ctx.shadowColor = b.color;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            // Draw Players
+            players.forEach(player => {
+                if (player.isDead) return;
+
+                ctx.save();
+                ctx.translate(player.x, player.y);
+
+                // Player Health Ring / Outer Glow
+                ctx.shadowColor = player.color;
+                ctx.shadowBlur = 12;
+
+                // Player Gun Barrel
+                ctx.fillStyle = '#64748b';
+                ctx.save();
+                ctx.rotate(player.angle);
+                ctx.fillRect(0, -4, player.radius + 12, 8);
+                ctx.restore();
+
+                // Player Body Circle
+                ctx.fillStyle = '#0f172a';
+                ctx.strokeStyle = player.color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.shadowBlur = 0;
+
+                // Player Name & HP Bar
+                ctx.font = '600 12px Orbitron';
+                ctx.fillStyle = '#e2e8f0';
+                ctx.textAlign = 'center';
+                ctx.fillText(player.name, 0, -player.radius - 14);
+
+                // Mini Health Bar above head
+                const hpWidth = 36;
+                const hpPercent = player.health / player.maxHealth;
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                ctx.fillRect(-hpWidth / 2, -player.radius - 10, hpWidth, 4);
+                ctx.fillStyle = hpPercent > 0.5 ? '#10b981' : (hpPercent > 0.2 ? '#f59e0b' : '#ef4444');
+                ctx.fillRect(-hpWidth / 2, -player.radius - 10, hpWidth * hpPercent, 4);
+
+                ctx.restore();
+            });
+
+            ctx.restore();
+        }
+
+        // --- MAIN GAME LOOP ---
+        function gameLoop(timestamp) {
+            const dt = (timestamp - lastFrameTime) / 1000;
+            lastFrameTime = timestamp;
+
+            // Handle Input & Local Movement
+            if (localPlayer && !localPlayer.isDead) {
+                let dx = 0;
+                let dy = 0;
+
+                if (keys.w) dy -= 1;
+                if (keys.s) dy += 1;
+                if (keys.a) dx -= 1;
+                if (keys.d) dx += 1;
+
+                // Touch Joystick overrides keyboard if active
+                if (touchMoveDir.x !== 0 || touchMoveDir.y !== 0) {
+                    dx = touchMoveDir.x;
+                    dy = touchMoveDir.y;
+                }
+
+                // Normalize diagonal speed
+                if (dx !== 0 && dy !== 0) {
+                    dx *= 0.7071;
+                    dy *= 0.7071;
+                }
+
+                localPlayer.move(dx, dy);
+
+                // Aiming Angle
+                if (!isTouchDevice) {
+                    localPlayer.angle = Math.atan2(mouse.worldY - localPlayer.y, mouse.worldX - localPlayer.x);
+                }
+
+                // Continuous Firing
+                if (mouse.down) {
+                    localPlayer.shoot();
+                }
+
+                // Update Camera World Position for aiming calculations
+                mouse.worldX = mouse.x + camera.x;
+                mouse.worldY = mouse.y + camera.y;
+            }
+
+            // Update All Players (AI logic ran inside if Host)
+            players.forEach(player => player.update(dt));
+
+            // Update Physics & FX
+            updateBullets();
+            updateParticles();
+
+            // Multiplayer Sync Broadcast
+            if (peer && isHost) {
+                broadcastState();
+            } else if (peer && !isHost && localPlayer) {
+                sendClientState();
+            }
+
+            // Update HUD Elements
+            updateHUD();
+
+            // Render Frame
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- MULTIPLAYER P2P (PEERJS) LOGIC ---
+        function initHost() {
+            isHost = true;
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                document.getElementById('hudRoomId').innerHTML = `${id.substring(0, 6)} <button id="copyRoomBtn" class="pointer-events-auto hover:text-white transition text-slate-400"><i class="fa-regular fa-copy"></i></button>`;
+                attachCopyListener(id);
+                spawnBots();
+            });
+
+            peer.on('connection', (conn) => {
+                peerConnections.set(conn.peer, conn);
+
+                conn.on('data', (data) => {
+                    handleClientMessage(conn.peer, data);
+                });
+
+                conn.on('close', () => {
+                    players.delete(conn.peer);
+                    peerConnections.delete(conn.peer);
+                });
+            });
+        }
+
+        function joinRoom(hostId) {
+            isHost = false;
+            peer = new Peer();
+
+            peer.on('open', () => {
+                const conn = peer.connect(hostId);
+                peerConnections.set(hostId, conn);
+
+                conn.on('open', () => {
+                    // Send join payload
+                    conn.send({
+                        type: 'JOIN',
+                        name: localPlayer.name
+                    });
+                });
+
+                conn.on('data', (data) => {
+                    handleHostMessage(data);
+                });
+            });
+        }
+
+        function broadcastState() {
+            const playersData = [];
+            players.forEach(p => {
+                playersData.push({
+                    id: p.id,
+                    name: p.name,
+                    x: p.x,
+                    y: p.y,
+                    angle: p.angle,
+                    health: p.health,
+                    kills: p.kills,
+                    deaths: p.deaths,
+                    selectedWeapon: p.selectedWeapon,
+                    isDead: p.isDead,
+                    isBot: p.isBot
+                });
+            });
+
+            const statePayload = {
+                type: 'SYNC',
+                players: playersData,
+                bullets: bullets.map(b => ({ x: b.x, y: b.y, color: b.color, size: b.size }))
+            };
+
+            peerConnections.forEach(conn => conn.send(statePayload));
+        }
+
+        function sendClientState() {
+            const conn = peerConnections.values().next().value;
+            if (conn && conn.open && localPlayer) {
+                conn.send({
+                    type: 'PLAYER_UPDATE',
+                    x: localPlayer.x,
+                    y: localPlayer.y,
+                    angle: localPlayer.angle,
+                    selectedWeapon: localPlayer.selectedWeapon,
+                    shooting: mouse.down
+                });
+            }
+        }
+
+        function handleClientMessage(peerId, data) {
+            if (data.type === 'JOIN') {
+                const spawn = getSafeSpawnPoint(20);
+                const newPlayer = new Player(peerId, data.name, spawn.x, spawn.y);
+                players.set(peerId, newPlayer);
+            } else if (data.type === 'PLAYER_UPDATE') {
+                const p = players.get(peerId);
+                if (p) {
+                    p.x = data.x;
+                    p.y = data.y;
+                    p.angle = data.angle;
+                    p.selectedWeapon = data.selectedWeapon;
+                    if (data.shooting) p.shoot();
+                }
+            }
+        }
+
+        function handleHostMessage(data) {
+            if (data.type === 'SYNC') {
+                data.players.forEach(pData => {
+                    let p = players.get(pData.id);
+                    if (!p) {
+                        p = new Player(pData.id, pData.name, pData.x, pData.y, pData.isBot);
+                        players.set(pData.id, p);
+                    }
+                    if (pData.id !== localPlayer.id) {
+                        p.x = pData.x;
+                        p.y = pData.y;
+                        p.angle = pData.angle;
+                        p.health = pData.health;
+                        p.kills = pData.kills;
+                        p.deaths = pData.deaths;
+                        p.selectedWeapon = pData.selectedWeapon;
+                        p.isDead = pData.isDead;
+                    }
+                });
+            }
+        }
+
+        // --- BOT MANAGEMENT ---
+        function spawnBots() {
+            // Clear existing bots
+            players.forEach((p, id) => {
+                if (p.isBot) players.delete(id);
+            });
+
+            for (let i = 1; i <= botCount; i++) {
+                const botId = `bot_${i}_${Math.random().toString(36).substr(2, 5)}`;
+                const botNames = ['VORTEX', 'NEXUS', 'CYPHER', 'BLADE', 'PHANTOM', 'SPECTRE', 'VIPER'];
+                const botName = botNames[(i - 1) % botNames.length];
+                const spawn = getSafeSpawnPoint(20);
+                const bot = new Player(botId, `[BOT] ${botName}`, spawn.x, spawn.y, true);
+                players.set(botId, bot);
+            }
+        }
+
+        // --- UI & HUD UPDATES ---
+        function updateHUD() {
+            if (!localPlayer) return;
+
+            // Health Bar
+            const hpPercent = Math.max(0, (localPlayer.health / localPlayer.maxHealth) * 100);
+            document.getElementById('healthBar').style.width = `${hpPercent}%`;
+            document.getElementById('healthText').innerText = `${Math.ceil(localPlayer.health)} / ${localPlayer.maxHealth}`;
+
+            // Weapon Info & Cooldown
+            const weapon = WEAPONS[localPlayer.selectedWeapon];
+            document.getElementById('weaponName').innerText = weapon.name;
+            const now = performance.now();
+            const timeSinceShot = now - localPlayer.lastShotTime;
+            const cooldownPercent = Math.min(100, (timeSinceShot / weapon.fireRate) * 100);
+            document.getElementById('ammoBar').style.width = `${cooldownPercent}%`;
+
+            // Leaderboard
+            const leaderboardList = document.getElementById('leaderboardList');
+            const sortedPlayers = Array.from(players.values()).sort((a, b) => b.kills - a.kills);
+            leaderboardList.innerHTML = sortedPlayers.map(p => `
+                <div class="flex justify-between items-center ${p.id === localPlayer.id ? 'text-cyan-400 font-bold' : 'text-slate-300'}">
+                    <span class="truncate max-w-[110px]">${p.name}</span>
+                    <span class="font-mono text-pink-400">${p.kills} / ${p.deaths}</span>
+                </div>
+            `).join('');
+        }
+
+        function setWeapon(weaponKey) {
+            if (!WEAPONS[weaponKey] || !localPlayer) return;
+            localPlayer.selectedWeapon = weaponKey;
+
+            // Update Hotbar UI
+            ['slot-1', 'slot-2', 'slot-3'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('glow-cyan', 'border-cyan-500');
+                el.classList.add('border-slate-700');
+            });
+            const activeId = weaponKey === 'pistol' ? 'slot-1' : (weaponKey === 'shotgun' ? 'slot-2' : 'slot-3');
+            const activeEl = document.getElementById(activeId);
+            activeEl.classList.add('glow-cyan', 'border-cyan-500');
+            activeEl.classList.remove('border-slate-700');
+        }
+
+        function attachCopyListener(id) {
+            document.getElementById('copyRoomBtn')?.addEventListener('click', () => {
+                navigator.clipboard.writeText(id);
+                const btn = document.getElementById('copyRoomBtn');
+                btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i>`;
+                setTimeout(() => btn.innerHTML = `<i class="fa-regular fa-copy"></i>`, 2000);
+            });
+        }
+
+        // --- INPUT EVENT LISTENERS ---
+        window.addEventListener('keydown', e => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || k === 'arrowup') keys.w = true;
+            if (k === 's' || k === 'arrowdown') keys.s = true;
+            if (k === 'a' || k === 'arrowleft') keys.a = true;
+            if (k === 'd' || k === 'arrowright') keys.d = true;
+
+            if (k === '1') setWeapon('pistol');
+            if (k === '2') setWeapon('shotgun');
+            if (k === '3') setWeapon('rifle');
+        });
+
+        window.addEventListener('keyup', e => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || k === 'arrowup') keys.w = false;
+            if (k === 's' || k === 'arrowdown') keys.s = false;
+            if (k === 'a' || k === 'arrowleft') keys.a = false;
+            if (k === 'd' || k === 'arrowright') keys.d = false;
+        });
+
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        window.addEventListener('mousedown', e => {
+            if (e.button === 0 && !e.target.closest('#hud') && !e.target.closest('#mainMenu')) {
+                sfx.init();
+                mouse.down = true;
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            mouse.down = false;
+        });
+
+        // --- TOUCH CONTROLS (MOBILE SUPPORT) ---
+        const joystickContainer = document.getElementById('joystickMove');
+        const joystickKnob = document.getElementById('joystickMoveKnob');
+
+        if ('ontouchstart' in window) {
+            isTouchDevice = true;
+            document.getElementById('mobileControls').classList.remove('hidden');
+
+            let touchId = null;
+            let startX = 0, startY = 0;
+
+            joystickContainer.addEventListener('touchstart', e => {
+                const touch = e.changedTouches[0];
+                touchId = touch.identifier;
+                const rect = joystickContainer.getBoundingClientRect();
+                startX = rect.left + rect.width / 2;
+                startY = rect.top + rect.height / 2;
+            });
+
+            window.addEventListener('touchmove', e => {
+                for (let touch of e.changedTouches) {
+                    if (touch.identifier === touchId) {
+                        const dx = touch.clientX - startX;
+                        const dy = touch.clientY - startY;
+                        const dist = Math.hypot(dx, dy);
+                        const maxRadius = 40;
+                        const angle = Math.atan2(dy, dx);
+
+                        const knobDist = Math.min(dist, maxRadius);
+                        joystickKnob.style.transform = `translate(${Math.cos(angle) * knobDist}px, ${Math.sin(angle) * knobDist}px)`;
+
+                        touchMoveDir.x = Math.cos(angle);
+                        touchMoveDir.y = Math.sin(angle);
+
+                        if (localPlayer) localPlayer.angle = angle;
+                    }
+                }
+            });
+
+            const resetJoystick = e => {
+                for (let touch of e.changedTouches) {
+                    if (touch.identifier === touchId) {
+                        touchId = null;
+                        joystickKnob.style.transform = `translate(0px, 0px)`;
+                        touchMoveDir = { x: 0, y: 0 };
+                    }
+                }
+            };
+
+            window.addEventListener('touchend', resetJoystick);
+            window.addEventListener('touchcancel', resetJoystick);
+
+            // Mobile Fire Button
+            const btnFire = document.getElementById('btnMobileFire');
+            btnFire.addEventListener('touchstart', e => {
+                e.preventDefault();
+                sfx.init();
+                mouse.down = true;
+            });
+            btnFire.addEventListener('touchend', e => {
+                e.preventDefault();
+                mouse.down = false;
+            });
+        }
+
+        // --- MENU INTERACTION LOGIC ---
+        function startGame(playerName) {
+            document.getElementById('mainMenu').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+
+            const myId = `player_${Math.random().toString(36).substr(2, 7)}`;
+            const spawn = getSafeSpawnPoint(20);
+            localPlayer = new Player(myId, playerName || 'CyberAgent', spawn.x, spawn.y);
+            players.set(myId, localPlayer);
+
+            sfx.init();
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.getElementById('btnSolo').addEventListener('click', () => {
+            const name = document.getElementById('inputPlayerName').value.trim();
+            isHost = true;
+            startGame(name);
+            spawnBots();
+        });
+
+        document.getElementById('btnHost').addEventListener('click', () => {
+            const name = document.getElementById('inputPlayerName').value.trim();
+            startGame(name);
+            initHost();
+        });
+
+        document.getElementById('btnJoin').addEventListener('click', () => {
+            const name = document.getElementById('inputPlayerName').value.trim();
+            const roomCode = document.getElementById('inputRoomCode').value.trim();
+            if (!roomCode) {
+                alert('Please enter a room code to join');
+                return;
+            }
+            startGame(name);
+            joinRoom(roomCode);
+        });
+
+        // Bot Count Config Buttons
+        document.getElementById('btnBotMinus').addEventListener('click', () => {
+            if (botCount > 0) {
+                botCount--;
+                document.getElementById('botCountText').innerText = botCount;
+            }
+        });
+
+        document.getElementById('btnBotPlus').addEventListener('click', () => {
+            if (botCount < 10) {
+                botCount++;
+                document.getElementById('botCountText').innerText = botCount;
+            }
+        });
+
+        // Hotbar Slot Click Events
+        document.getElementById('slot-1').addEventListener('click', () => setWeapon('pistol'));
+        document.getElementById('slot-2').addEventListener('click', () => setWeapon('shotgun'));
+        document.getElementById('slot-3').addEventListener('click', () => setWeapon('rifle'));
+
+        // Audio Toggle
+        document.getElementById('btnAudioToggle').addEventListener('click', () => {
+            sfx.enabled = !sfx.enabled;
+            document.getElementById('btnAudioToggle').innerHTML = sfx.enabled ? 
+                `<i class="fa-solid fa-volume-high text-lg text-cyan-400"></i>` : 
+                `<i class="fa-solid fa-volume-xmark text-lg text-slate-500"></i>`;
+        });
+
+        // Respawn Button
+        document.getElementById('btnRespawn').addEventListener('click', () => {
+            if (localPlayer) localPlayer.respawn();
+        });
+    </script>
+</body>
+</html>
