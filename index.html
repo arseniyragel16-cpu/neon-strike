@@ -222,20 +222,38 @@
             </div>
         </div>
 
-        <!-- Mobile Touch Controls (Automatically visible on touch devices) -->
-        <div id="mobileControls" class="pointer-events-auto md:hidden flex justify-between items-end w-full px-4 pb-6 gap-4 select-none">
-            <!-- Left Movement Joystick Area -->
-            <div id="joystickMove" class="w-36 h-36 bg-slate-900/80 rounded-full border-2 border-cyan-500/60 relative flex items-center justify-center glow-cyan backdrop-blur-md">
-                <div class="absolute inset-0 rounded-full bg-cyan-500/10 animate-pulse pointer-events-none"></div>
-                <div class="text-[10px] font-orbitron text-cyan-400/50 absolute top-2 pointer-events-none">MOVE</div>
-                <div id="joystickMoveKnob" class="w-14 h-14 bg-gradient-to-tr from-cyan-600 to-cyan-400 rounded-full shadow-2xl border-2 border-white pointer-events-none transform transition-transform duration-75"></div>
+        <!-- Mobile Touch Overlay (Fixed Touch Control Zones & Large Buttons) -->
+        <div id="mobileControls" class="pointer-events-auto md:hidden absolute inset-0 z-20 flex justify-between select-none pointer-events-none">
+            <!-- Left Screen Half: Dynamic Move Touch Zone -->
+            <div id="touchZoneMove" class="w-1/2 h-full relative pointer-events-auto">
+                <div id="joystickMove" class="absolute w-28 h-28 bg-slate-900/70 border-2 border-cyan-400 rounded-full hidden items-center justify-center transform -translate-x-1/2 -translate-y-1/2 glow-cyan backdrop-blur-sm">
+                    <div id="joystickMoveKnob" class="w-12 h-12 bg-cyan-400 rounded-full shadow-lg border-2 border-white"></div>
+                </div>
+                <div class="absolute bottom-6 left-6 text-xs font-orbitron text-cyan-400/40 pointer-events-none">
+                    <i class="fa-solid fa-hand-pointer mr-1"></i> TOUCH TO MOVE
+                </div>
             </div>
 
-            <!-- Right Aiming & Shooting Joystick Area -->
-            <div id="joystickAim" class="w-36 h-36 bg-slate-900/80 rounded-full border-2 border-pink-500/60 relative flex items-center justify-center glow-magenta backdrop-blur-md">
-                <div class="absolute inset-0 rounded-full bg-pink-500/10 animate-pulse pointer-events-none"></div>
-                <div class="text-[10px] font-orbitron text-pink-400/50 absolute top-2 pointer-events-none">AIM & FIRE</div>
-                <div id="joystickAimKnob" class="w-14 h-14 bg-gradient-to-tr from-pink-600 to-pink-400 rounded-full shadow-2xl border-2 border-white pointer-events-none transform transition-transform duration-75"></div>
+            <!-- Right Screen Half: Aim Zone & Giant FIRE Button -->
+            <div id="touchZoneAim" class="w-1/2 h-full relative pointer-events-auto flex flex-col justify-end items-end p-6 gap-3">
+                <!-- Mobile Weapon Quick Switch Bar -->
+                <div class="flex gap-2 mb-2 pointer-events-auto">
+                    <button id="mBtnSlot1" class="w-10 h-10 bg-slate-900/80 border border-cyan-500 rounded-lg font-orbitron text-xs font-bold text-cyan-400 active:scale-95">1</button>
+                    <button id="mBtnSlot2" class="w-10 h-10 bg-slate-900/80 border border-slate-700 rounded-lg font-orbitron text-xs font-bold text-slate-300 active:scale-95">2</button>
+                    <button id="mBtnSlot3" class="w-10 h-10 bg-slate-900/80 border border-slate-700 rounded-lg font-orbitron text-xs font-bold text-slate-300 active:scale-95">3</button>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <!-- Dynamic Aim Indicator -->
+                    <div id="joystickAim" class="absolute w-28 h-28 bg-slate-900/70 border-2 border-pink-500 rounded-full hidden items-center justify-center transform -translate-x-1/2 -translate-y-1/2 glow-magenta backdrop-blur-sm">
+                        <div id="joystickAimKnob" class="w-12 h-12 bg-pink-500 rounded-full shadow-lg border-2 border-white"></div>
+                    </div>
+
+                    <!-- GIANT FIRE BUTTON -->
+                    <button id="btnMobileFire" class="w-24 h-24 rounded-full bg-gradient-to-tr from-rose-600 via-pink-500 to-amber-400 text-white font-orbitron font-black text-sm tracking-wider shadow-2xl border-4 border-white/80 active:scale-90 transition transform glow-magenta flex items-center justify-center pointer-events-auto">
+                        FIRE!
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -937,7 +955,8 @@
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' }
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' }
                 ]
             }
         };
@@ -960,6 +979,11 @@
                 peerConnections.set(conn.peer, conn);
 
                 conn.on('open', () => {
+                    // Send room info to new peer immediately
+                    conn.send({
+                        type: 'INIT_ROOM',
+                        roomId: peer.id
+                    });
                     broadcastState();
                 });
 
@@ -985,11 +1009,20 @@
 
         function joinRoom(hostId) {
             isHost = false;
+            const cleanRoomCode = hostId.trim();
             peer = new Peer(PEER_CONFIG);
 
+            // Update UI status immediately for Joining Client
+            document.getElementById('hudRoomId').innerHTML = `
+                <span class="text-pink-400 font-mono">${cleanRoomCode}</span>
+                <button id="copyRoomBtn" class="pointer-events-auto hover:text-white transition text-cyan-400 p-1" title="Copy Room ID">
+                    <i class="fa-regular fa-copy"></i>
+                </button>`;
+            attachCopyListener(cleanRoomCode);
+
             peer.on('open', () => {
-                const conn = peer.connect(hostId.trim(), { reliable: true });
-                peerConnections.set(hostId, conn);
+                const conn = peer.connect(cleanRoomCode, { reliable: true });
+                peerConnections.set(cleanRoomCode, conn);
 
                 conn.on('open', () => {
                     conn.send({
@@ -1015,95 +1048,118 @@
                 alert('Network connection error: ' + err.type);
             });
         }
-        // --- TOUCH CONTROLS (DUAL JOYSTICK MOBILE SUPPORT) ---
+
+        // --- TOUCH CONTROLS (DYNAMIC TOUCH PADS + GIANT FIRE BUTTON) ---
+        const touchZoneMove = document.getElementById('touchZoneMove');
+        const touchZoneAim = document.getElementById('touchZoneAim');
         const joystickMove = document.getElementById('joystickMove');
         const joystickMoveKnob = document.getElementById('joystickMoveKnob');
         const joystickAim = document.getElementById('joystickAim');
         const joystickAimKnob = document.getElementById('joystickAimKnob');
+        const btnMobileFire = document.getElementById('btnMobileFire');
+
+        let moveTouchId = null;
+        let aimTouchId = null;
+        let moveCenter = { x: 0, y: 0 };
+        let aimCenter = { x: 0, y: 0 };
+        let mobileShooting = false;
 
         if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
             isTouchDevice = true;
-            document.getElementById('mobileControls').classList.remove('hidden');
 
-            let moveTouchId = null;
-            let aimTouchId = null;
-            let moveStartX = 0, moveStartY = 0;
-            let aimStartX = 0, aimStartY = 0;
-
-            // --- LEFT MOVE JOYSTICK ---
-            joystickMove.addEventListener('touchstart', e => {
+            // Touch Movement Zone (Left Half of Screen)
+            touchZoneMove.addEventListener('touchstart', e => {
                 e.preventDefault();
                 sfx.init();
                 const touch = e.changedTouches[0];
                 moveTouchId = touch.identifier;
-                const rect = joystickMove.getBoundingClientRect();
-                moveStartX = rect.left + rect.width / 2;
-                moveStartY = rect.top + rect.height / 2;
+                moveCenter = { x: touch.clientX, y: touch.clientY };
+
+                joystickMove.style.left = `${moveCenter.x}px`;
+                joystickMove.style.top = `${moveCenter.y}px`;
+                joystickMove.style.display = 'flex';
+                joystickMoveKnob.style.transform = `translate(0px, 0px)`;
             }, { passive: false });
 
-            // --- RIGHT AIM & FIRE JOYSTICK ---
-            joystickAim.addEventListener('touchstart', e => {
+            // Touch Aim Zone (Right Half of Screen)
+            touchZoneAim.addEventListener('touchstart', e => {
+                if (e.target.closest('#btnMobileFire') || e.target.closest('#mBtnSlot1') || e.target.closest('#mBtnSlot2') || e.target.closest('#mBtnSlot3')) return;
                 e.preventDefault();
                 sfx.init();
                 const touch = e.changedTouches[0];
                 aimTouchId = touch.identifier;
-                const rect = joystickAim.getBoundingClientRect();
-                aimStartX = rect.left + rect.width / 2;
-                aimStartY = rect.top + rect.height / 2;
+                aimCenter = { x: touch.clientX, y: touch.clientY };
+
+                joystickAim.style.left = `${aimCenter.x}px`;
+                joystickAim.style.top = `${aimCenter.y}px`;
+                joystickAim.style.display = 'flex';
+                joystickAimKnob.style.transform = `translate(0px, 0px)`;
                 isTouchAiming = true;
             }, { passive: false });
 
             window.addEventListener('touchmove', e => {
                 for (let touch of e.changedTouches) {
-                    // Move Joystick update
                     if (touch.identifier === moveTouchId) {
-                        const dx = touch.clientX - moveStartX;
-                        const dy = touch.clientY - moveStartY;
+                        const dx = touch.clientX - moveCenter.x;
+                        const dy = touch.clientY - moveCenter.y;
                         const dist = Math.hypot(dx, dy);
-                        const maxRadius = 45;
                         const angle = Math.atan2(dy, dx);
-                        const knobDist = Math.min(dist, maxRadius);
+                        const maxR = 40;
+                        const r = Math.min(dist, maxR);
 
-                        joystickMoveKnob.style.transform = `translate(${Math.cos(angle) * knobDist}px, ${Math.sin(angle) * knobDist}px)`;
-                        touchMoveDir.x = Math.cos(angle);
-                        touchMoveDir.y = Math.sin(angle);
+                        joystickMoveKnob.style.transform = `translate(${Math.cos(angle) * r}px, ${Math.sin(angle) * r}px)`;
+                        touchMoveDir = { x: Math.cos(angle), y: Math.sin(angle) };
                     }
 
-                    // Aim Joystick update
                     if (touch.identifier === aimTouchId) {
-                        const dx = touch.clientX - aimStartX;
-                        const dy = touch.clientY - aimStartY;
+                        const dx = touch.clientX - aimCenter.x;
+                        const dy = touch.clientY - aimCenter.y;
                         const dist = Math.hypot(dx, dy);
-                        const maxRadius = 45;
                         const angle = Math.atan2(dy, dx);
-                        const knobDist = Math.min(dist, maxRadius);
+                        const maxR = 40;
+                        const r = Math.min(dist, maxR);
 
-                        joystickAimKnob.style.transform = `translate(${Math.cos(angle) * knobDist}px, ${Math.sin(angle) * knobDist}px)`;
-                        touchAimDir.x = Math.cos(angle);
-                        touchAimDir.y = Math.sin(angle);
+                        joystickAimKnob.style.transform = `translate(${Math.cos(angle) * r}px, ${Math.sin(angle) * r}px)`;
+                        touchAimDir = { x: Math.cos(angle), y: Math.sin(angle) };
                         isTouchAiming = true;
                     }
                 }
             }, { passive: true });
 
-            const handleTouchEnd = e => {
+            const endTouch = e => {
                 for (let touch of e.changedTouches) {
                     if (touch.identifier === moveTouchId) {
                         moveTouchId = null;
-                        joystickMoveKnob.style.transform = `translate(0px, 0px)`;
+                        joystickMove.style.display = 'none';
                         touchMoveDir = { x: 0, y: 0 };
                     }
                     if (touch.identifier === aimTouchId) {
                         aimTouchId = null;
-                        joystickAimKnob.style.transform = `translate(0px, 0px)`;
-                        touchAimDir = { x: 0, y: 0 };
+                        joystickAim.style.display = 'none';
                         isTouchAiming = false;
                     }
                 }
             };
 
-            window.addEventListener('touchend', handleTouchEnd);
-            window.addEventListener('touchcancel', handleTouchEnd);
+            window.addEventListener('touchend', endTouch);
+            window.addEventListener('touchcancel', endTouch);
+
+            // Large FIRE button handlers
+            btnMobileFire.addEventListener('touchstart', e => {
+                e.preventDefault();
+                sfx.init();
+                mobileShooting = true;
+            }, { passive: false });
+
+            btnMobileFire.addEventListener('touchend', e => {
+                e.preventDefault();
+                mobileShooting = false;
+            }, { passive: false });
+
+            // Mobile Quick Weapon buttons
+            document.getElementById('mBtnSlot1').addEventListener('touchstart', () => setWeapon('pistol'));
+            document.getElementById('mBtnSlot2').addEventListener('touchstart', () => setWeapon('shotgun'));
+            document.getElementById('mBtnSlot3').addEventListener('touchstart', () => setWeapon('rifle'));
         }
 
         function broadcastState() {
@@ -1165,7 +1221,14 @@
         }
 
         function handleHostMessage(data) {
-            if (data.type === 'SYNC') {
+            if (data.type === 'INIT_ROOM') {
+                document.getElementById('hudRoomId').innerHTML = `
+                    <span class="text-pink-400 font-mono">${data.roomId}</span>
+                    <button id="copyRoomBtn" class="pointer-events-auto hover:text-white transition text-cyan-400 p-1" title="Copy Room ID">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>`;
+                attachCopyListener(data.roomId);
+            } else if (data.type === 'SYNC') {
                 data.players.forEach(pData => {
                     let p = players.get(pData.id);
                     if (!p) {
@@ -1236,74 +1299,75 @@
             localPlayer.selectedWeapon = weaponKey;
 
             // Update Hotbar UI
-            ['slot-1', 'slot-2', 'slot-3'].forEach(id => {
-                const el = document.getElementById(id);
-                el.classList.remove('glow-cyan', 'border-cyan-500');
-                el.classList.add('border-slate-700');
-            });
-            const activeId = weaponKey === 'pistol' ? 'slot-1' : (weaponKey === 'shotgun' ? 'slot-2' : 'slot-3');
-            const activeEl = document.getElementById(activeId);
-            activeEl.classList.add('glow-cyan', 'border-cyan-500');
-            activeEl.classList.remove('border-slate-700');
-        }
+        // --- MAIN GAME LOOP ---
+        function gameLoop(timestamp) {
+            const dt = (timestamp - lastFrameTime) / 1000;
+            lastFrameTime = timestamp;
 
-        function attachCopyListener(id) {
-            document.getElementById('copyRoomBtn')?.addEventListener('click', () => {
-                navigator.clipboard.writeText(id);
-                const btn = document.getElementById('copyRoomBtn');
-                btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i>`;
-                setTimeout(() => btn.innerHTML = `<i class="fa-regular fa-copy"></i>`, 2000);
-            });
-        }
+            // Handle Input & Local Movement
+            if (localPlayer && !localPlayer.isDead) {
+                let dx = 0;
+                let dy = 0;
 
-        // --- INPUT EVENT LISTENERS ---
-        window.addEventListener('keydown', e => {
-            const k = e.key.toLowerCase();
-            if (k === 'w' || k === 'arrowup') keys.w = true;
-            if (k === 's' || k === 'arrowdown') keys.s = true;
-            if (k === 'a' || k === 'arrowleft') keys.a = true;
-            if (k === 'd' || k === 'arrowright') keys.d = true;
+                if (keys.w) dy -= 1;
+                if (keys.s) dy += 1;
+                if (keys.a) dx -= 1;
+                if (keys.d) dx += 1;
 
-            if (k === '1') setWeapon('pistol');
-            if (k === '2') setWeapon('shotgun');
-            if (k === '3') setWeapon('rifle');
-        });
+                // Touch Movement Joystick
+                if (touchMoveDir.x !== 0 || touchMoveDir.y !== 0) {
+                    dx = touchMoveDir.x;
+                    dy = touchMoveDir.y;
+                }
 
-        window.addEventListener('keyup', e => {
-            const k = e.key.toLowerCase();
-            if (k === 'w' || k === 'arrowup') keys.w = false;
-            if (k === 's' || k === 'arrowdown') keys.s = false;
-            if (k === 'a' || k === 'arrowleft') keys.a = false;
-            if (k === 'd' || k === 'arrowright') keys.d = false;
-        });
+                // Normalize diagonal speed
+                if (dx !== 0 && dy !== 0) {
+                    dx *= 0.7071;
+                    dy *= 0.7071;
+                }
 
-        window.addEventListener('mousemove', e => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
-        });
+                localPlayer.move(dx, dy);
 
-        window.addEventListener('mousedown', e => {
-            if (e.button === 0 && !e.target.closest('#hud') && !e.target.closest('#mainMenu')) {
-                sfx.init();
-                mouse.down = true;
+                // Touch Aiming Joystick / Mouse Aiming
+                if (isTouchDevice) {
+                    if (isTouchAiming && (touchAimDir.x !== 0 || touchAimDir.y !== 0)) {
+                        localPlayer.angle = Math.atan2(touchAimDir.y, touchAimDir.x);
+                    }
+                    if (mobileShooting || (isTouchAiming && (touchAimDir.x !== 0 || touchAimDir.y !== 0))) {
+                        localPlayer.shoot();
+                    }
+                } else {
+                    localPlayer.angle = Math.atan2(mouse.worldY - localPlayer.y, mouse.worldX - localPlayer.x);
+                    if (mouse.down) {
+                        localPlayer.shoot();
+                    }
+                }
+
+                // Update Camera World Position for aiming calculations
+                mouse.worldX = mouse.x + camera.x;
+                mouse.worldY = mouse.y + camera.y;
             }
-        });
 
-        window.addEventListener('mouseup', () => {
-            mouse.down = false;
-        });
+            // Update All Players (AI logic ran inside if Host)
+            players.forEach(player => player.update(dt));
 
-        // --- MENU INTERACTION LOGIC ---
-        function startGame(playerName) {
-            document.getElementById('mainMenu').classList.add('hidden');
-            document.getElementById('hud').classList.remove('hidden');
+            // Update Physics & FX
+            updateBullets();
+            updateParticles();
 
-            const myId = `player_${Math.random().toString(36).substr(2, 7)}`;
-            const spawn = getSafeSpawnPoint(20);
-            localPlayer = new Player(myId, playerName || 'CyberAgent', spawn.x, spawn.y);
-            players.set(myId, localPlayer);
+            // Multiplayer Sync Broadcast
+            if (peer && isHost) {
+                broadcastState();
+            } else if (peer && !isHost && localPlayer) {
+                sendClientState();
+            }
 
-            sfx.init();
+            // Update HUD Elements
+            updateHUD();
+
+            // Render Frame
+            render();
+
             requestAnimationFrame(gameLoop);
         }
 
