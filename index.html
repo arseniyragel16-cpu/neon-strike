@@ -97,6 +97,65 @@
     <!-- CRT Scanline Effect Layer -->
     <div class="scanlines absolute inset-0 z-10"></div>
 
+    <!-- Main Menu Overlay -->
+    <div id="mainMenu" class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
+        <div class="max-w-md w-full bg-slate-900/90 border border-cyan-500/40 rounded-2xl p-6 md:p-8 glow-cyan flex flex-col items-center text-center relative shadow-2xl">
+            <!-- Audio Toggle Button -->
+            <button id="btnAudioToggle" class="absolute top-4 right-4 p-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-cyan-500 transition">
+                <i class="fa-solid fa-volume-high text-lg text-cyan-400"></i>
+            </button>
+
+            <!-- Title -->
+            <h1 class="font-orbitron text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-pink-500 tracking-wider mb-1 text-glow-cyan">
+                NEON STRIKE
+            </h1>
+            <p class="text-xs font-orbitron text-slate-400 tracking-widest uppercase mb-6">Cyberpunk 2D Multiplayer Shooter</p>
+
+            <!-- Player Nickname Input -->
+            <div class="w-full mb-4 text-left">
+                <label class="block font-orbitron text-xs text-cyan-400 mb-1">CALLSIGN / NAME</label>
+                <input id="inputPlayerName" type="text" maxlength="14" placeholder="Enter Nickname..." value="CyberAgent"
+                    class="w-full bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-lg px-4 py-2 text-white font-orbitron outline-none transition">
+            </div>
+
+            <!-- Bot Counter Selector -->
+            <div class="w-full mb-6 flex items-center justify-between bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                <span class="font-orbitron text-xs text-slate-300">AI BOTS</span>
+                <div class="flex items-center gap-3">
+                    <button id="btnBotMinus" class="w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold border border-slate-700">-</button>
+                    <span id="botCountText" class="font-orbitron font-bold text-cyan-300 w-4 text-center">4</span>
+                    <button id="btnBotPlus" class="w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold border border-slate-700">+</button>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="w-full space-y-3">
+                <button id="btnSolo" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-teal-500 hover:from-cyan-500 hover:to-teal-400 text-white font-orbitron font-bold rounded-lg shadow-lg tracking-wider transition">
+                    <i class="fa-solid fa-user-robot mr-2"></i> PLAY SOLO vs BOTS
+                </button>
+                
+                <button id="btnHost" class="w-full py-3 bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 text-white font-orbitron font-bold rounded-lg shadow-lg tracking-wider transition">
+                    <i class="fa-solid fa-server mr-2"></i> CREATE ROOM (HOST)
+                </button>
+
+                <!-- Join Room Divider -->
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-slate-800"></div>
+                    <span class="flex-shrink mx-4 text-xs font-orbitron text-slate-500 uppercase">OR JOIN FRIEND</span>
+                    <div class="flex-grow border-t border-slate-800"></div>
+                </div>
+
+                <div class="flex gap-2">
+                    <input id="inputRoomCode" type="text" placeholder="Paste Room Code..." 
+                        class="flex-1 bg-slate-950 border border-slate-700 focus:border-pink-500 rounded-lg px-3 py-2 text-white text-xs font-mono outline-none transition uppercase">
+                    <button id="btnJoin" class="px-5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-pink-500 text-pink-400 font-orbitron font-bold text-xs rounded-lg transition">
+                        JOIN
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- HUD Overlay (Visible during gameplay) -->
     <div id="hud" class="absolute inset-0 z-20 pointer-events-none hidden flex flex-col justify-between p-4 md:p-6">
         
@@ -164,81 +223,19 @@
         </div>
 
         <!-- Mobile Touch Controls (Automatically visible on touch devices) -->
-        <div id="mobileControls" class="pointer-events-auto md:hidden flex justify-between items-end w-full px-2 pb-2">
+        <div id="mobileControls" class="pointer-events-auto md:hidden flex justify-between items-end w-full px-4 pb-6 gap-4 select-none">
             <!-- Left Movement Joystick Area -->
-            <div id="joystickMove" class="w-28 h-28 bg-slate-900/60 rounded-full border border-cyan-500/40 relative flex items-center justify-center">
-                <div id="joystickMoveKnob" class="w-10 h-10 bg-cyan-500/80 rounded-full shadow-lg border border-white"></div>
-            </div>
-            <!-- Right Fire Button -->
-            <button id="btnMobileFire" class="w-20 h-20 bg-pink-600/80 active:bg-pink-500 rounded-full border-2 border-pink-400 flex items-center justify-center text-white font-orbitron font-bold text-sm shadow-lg glow-magenta">
-                FIRE
-            </button>
-        </div>
-    </div>
-
-    <!-- Main Menu Modal -->
-    <div id="mainMenu" class="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
-        <div class="max-w-md w-full bg-slate-900/90 border border-cyan-500/50 rounded-2xl p-6 md:p-8 glow-cyan flex flex-col gap-6 relative overflow-hidden">
-            
-            <!-- Neon Header Decorative Lines -->
-            <div class="absolute -top-12 -right-12 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
-            <div class="absolute -bottom-12 -left-12 w-32 h-32 bg-pink-500/10 rounded-full blur-2xl pointer-events-none"></div>
-
-            <div class="text-center">
-                <h1 class="font-orbitron text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-pink-500 tracking-wider">
-                    NEON STRIKE
-                </h1>
-                <p class="text-xs font-orbitron text-cyan-400/80 tracking-widest mt-1">CYBERPUNK TOP-DOWN ARENA</p>
+            <div id="joystickMove" class="w-36 h-36 bg-slate-900/80 rounded-full border-2 border-cyan-500/60 relative flex items-center justify-center glow-cyan backdrop-blur-md">
+                <div class="absolute inset-0 rounded-full bg-cyan-500/10 animate-pulse pointer-events-none"></div>
+                <div class="text-[10px] font-orbitron text-cyan-400/50 absolute top-2 pointer-events-none">MOVE</div>
+                <div id="joystickMoveKnob" class="w-14 h-14 bg-gradient-to-tr from-cyan-600 to-cyan-400 rounded-full shadow-2xl border-2 border-white pointer-events-none transform transition-transform duration-75"></div>
             </div>
 
-            <!-- Player Profile Setup -->
-            <div class="space-y-2">
-                <label class="block text-xs font-orbitron text-slate-300">PLAYER NAME</label>
-                <input id="inputPlayerName" type="text" maxlength="12" placeholder="CyberNinja" 
-                       class="w-full bg-slate-950 border border-cyan-500/40 rounded-lg px-4 py-2.5 text-cyan-300 font-orbitron focus:outline-none focus:border-cyan-400 transition">
-            </div>
-
-            <!-- Game Mode Options -->
-            <div class="space-y-3">
-                <button id="btnSolo" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-teal-500 hover:from-cyan-500 hover:to-teal-400 text-slate-950 font-orbitron font-bold rounded-lg transition shadow-lg flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-robot"></i> PRACTICE VS BOTS
-                </button>
-
-                <div class="flex items-center gap-2 my-2">
-                    <div class="h-px bg-slate-800 flex-1"></div>
-                    <span class="text-xs font-orbitron text-slate-500">OR MULTIPLAYER</span>
-                    <div class="h-px bg-slate-800 flex-1"></div>
-                </div>
-
-                <button id="btnHost" class="w-full py-3 bg-slate-950 hover:bg-slate-900 border border-pink-500/60 text-pink-400 hover:text-pink-300 font-orbitron font-bold rounded-lg transition glow-magenta flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-server"></i> CREATE ROOM (HOST)
-                </button>
-
-                <div class="flex gap-2">
-                    <input id="inputRoomCode" type="text" placeholder="ROOM CODE" 
-                           class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-orbitron text-cyan-300 uppercase focus:outline-none focus:border-cyan-500">
-                    <button id="btnJoin" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 border border-cyan-500/40 text-cyan-400 font-orbitron text-xs font-bold rounded-lg transition">
-                        JOIN
-                    </button>
-                </div>
-            </div>
-
-            <!-- Bot Controls Count -->
-            <div class="flex justify-between items-center bg-slate-950/60 p-3 rounded-lg border border-slate-800">
-                <span class="text-xs font-orbitron text-slate-400">AI BOTS COUNT</span>
-                <div class="flex items-center gap-3">
-                    <button id="btnBotMinus" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 rounded text-cyan-400 font-bold">-</button>
-                    <span id="botCountText" class="text-xs font-orbitron font-bold text-white">4</span>
-                    <button id="btnBotPlus" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 rounded text-cyan-400 font-bold">+</button>
-                </div>
-            </div>
-
-            <!-- Sound Toggle -->
-            <div class="flex justify-between items-center text-xs font-orbitron text-slate-400">
-                <span>AUDIO SYNTHESIZER</span>
-                <button id="btnAudioToggle" class="text-cyan-400 hover:text-cyan-300 transition">
-                    <i class="fa-solid fa-volume-high text-lg"></i>
-                </button>
+            <!-- Right Aiming & Shooting Joystick Area -->
+            <div id="joystickAim" class="w-36 h-36 bg-slate-900/80 rounded-full border-2 border-pink-500/60 relative flex items-center justify-center glow-magenta backdrop-blur-md">
+                <div class="absolute inset-0 rounded-full bg-pink-500/10 animate-pulse pointer-events-none"></div>
+                <div class="text-[10px] font-orbitron text-pink-400/50 absolute top-2 pointer-events-none">AIM & FIRE</div>
+                <div id="joystickAimKnob" class="w-14 h-14 bg-gradient-to-tr from-pink-600 to-pink-400 rounded-full shadow-2xl border-2 border-white pointer-events-none transform transition-transform duration-75"></div>
             </div>
         </div>
     </div>
@@ -256,8 +253,7 @@
     <script>
         /**
          * NEON STRIKE - Top-Down 2D Multiplayer Shooter
-         * Features: HTML5 Canvas, Web Audio Synthesizer, PeerJS WebRTC P2P Multiplayer,
-         * AI Bot pathfinding/shooting, custom weapons, neon visual particle system.
+         * Features: Dual Joystick Touch Controls, Robust WebRTC Multiplayer, AI Bots.
          */
 
         // --- GLOBAL CONSTANTS & CONFIG ---
@@ -410,9 +406,9 @@
         const keys = { w: false, a: false, s: false, d: false };
         const mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false };
         let touchMoveDir = { x: 0, y: 0 };
+        let touchAimDir = { x: 0, y: 0 };
         let isTouchDevice = false;
-
-        // --- PLAYER CLASS ---
+        let isTouchAiming = false;
         class Player {
             constructor(id, name, x, y, isBot = false) {
                 this.id = id;
@@ -879,7 +875,7 @@
                 if (keys.a) dx -= 1;
                 if (keys.d) dx += 1;
 
-                // Touch Joystick overrides keyboard if active
+                // Touch Movement Joystick
                 if (touchMoveDir.x !== 0 || touchMoveDir.y !== 0) {
                     dx = touchMoveDir.x;
                     dy = touchMoveDir.y;
@@ -893,14 +889,17 @@
 
                 localPlayer.move(dx, dy);
 
-                // Aiming Angle
-                if (!isTouchDevice) {
+                // Touch Aiming Joystick / Mouse Aiming
+                if (isTouchDevice) {
+                    if (isTouchAiming) {
+                        localPlayer.angle = Math.atan2(touchAimDir.y, touchAimDir.x);
+                        localPlayer.shoot();
+                    }
+                } else {
                     localPlayer.angle = Math.atan2(mouse.worldY - localPlayer.y, mouse.worldX - localPlayer.x);
-                }
-
-                // Continuous Firing
-                if (mouse.down) {
-                    localPlayer.shoot();
+                    if (mouse.down) {
+                        localPlayer.shoot();
+                    }
                 }
 
                 // Update Camera World Position for aiming calculations
@@ -932,18 +931,37 @@
         }
 
         // --- MULTIPLAYER P2P (PEERJS) LOGIC ---
+        const PEER_CONFIG = {
+            debug: 1,
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' }
+                ]
+            }
+        };
+
         function initHost() {
             isHost = true;
-            peer = new Peer();
+            peer = new Peer(PEER_CONFIG);
 
             peer.on('open', (id) => {
-                document.getElementById('hudRoomId').innerHTML = `${id.substring(0, 6)} <button id="copyRoomBtn" class="pointer-events-auto hover:text-white transition text-slate-400"><i class="fa-regular fa-copy"></i></button>`;
+                document.getElementById('hudRoomId').innerHTML = `
+                    <span class="text-cyan-300 font-mono select-all">${id}</span>
+                    <button id="copyRoomBtn" class="pointer-events-auto hover:text-white transition text-cyan-400 p-1" title="Copy Room ID">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>`;
                 attachCopyListener(id);
                 spawnBots();
             });
 
             peer.on('connection', (conn) => {
                 peerConnections.set(conn.peer, conn);
+
+                conn.on('open', () => {
+                    broadcastState();
+                });
 
                 conn.on('data', (data) => {
                     handleClientMessage(conn.peer, data);
@@ -953,19 +971,27 @@
                     players.delete(conn.peer);
                     peerConnections.delete(conn.peer);
                 });
+
+                conn.on('error', (err) => {
+                    console.error('Connection error:', err);
+                });
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                alert('Connection error: ' + err.type);
             });
         }
 
         function joinRoom(hostId) {
             isHost = false;
-            peer = new Peer();
+            peer = new Peer(PEER_CONFIG);
 
             peer.on('open', () => {
-                const conn = peer.connect(hostId);
+                const conn = peer.connect(hostId.trim(), { reliable: true });
                 peerConnections.set(hostId, conn);
 
                 conn.on('open', () => {
-                    // Send join payload
                     conn.send({
                         type: 'JOIN',
                         name: localPlayer.name
@@ -975,7 +1001,109 @@
                 conn.on('data', (data) => {
                     handleHostMessage(data);
                 });
+
+                conn.on('close', () => {
+                    alert('Disconnected from Host!');
+                });
+
+                conn.on('error', (err) => {
+                    alert('Failed to connect to host: ' + err);
+                });
             });
+
+            peer.on('error', (err) => {
+                alert('Network connection error: ' + err.type);
+            });
+        }
+        // --- TOUCH CONTROLS (DUAL JOYSTICK MOBILE SUPPORT) ---
+        const joystickMove = document.getElementById('joystickMove');
+        const joystickMoveKnob = document.getElementById('joystickMoveKnob');
+        const joystickAim = document.getElementById('joystickAim');
+        const joystickAimKnob = document.getElementById('joystickAimKnob');
+
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            isTouchDevice = true;
+            document.getElementById('mobileControls').classList.remove('hidden');
+
+            let moveTouchId = null;
+            let aimTouchId = null;
+            let moveStartX = 0, moveStartY = 0;
+            let aimStartX = 0, aimStartY = 0;
+
+            // --- LEFT MOVE JOYSTICK ---
+            joystickMove.addEventListener('touchstart', e => {
+                e.preventDefault();
+                sfx.init();
+                const touch = e.changedTouches[0];
+                moveTouchId = touch.identifier;
+                const rect = joystickMove.getBoundingClientRect();
+                moveStartX = rect.left + rect.width / 2;
+                moveStartY = rect.top + rect.height / 2;
+            }, { passive: false });
+
+            // --- RIGHT AIM & FIRE JOYSTICK ---
+            joystickAim.addEventListener('touchstart', e => {
+                e.preventDefault();
+                sfx.init();
+                const touch = e.changedTouches[0];
+                aimTouchId = touch.identifier;
+                const rect = joystickAim.getBoundingClientRect();
+                aimStartX = rect.left + rect.width / 2;
+                aimStartY = rect.top + rect.height / 2;
+                isTouchAiming = true;
+            }, { passive: false });
+
+            window.addEventListener('touchmove', e => {
+                for (let touch of e.changedTouches) {
+                    // Move Joystick update
+                    if (touch.identifier === moveTouchId) {
+                        const dx = touch.clientX - moveStartX;
+                        const dy = touch.clientY - moveStartY;
+                        const dist = Math.hypot(dx, dy);
+                        const maxRadius = 45;
+                        const angle = Math.atan2(dy, dx);
+                        const knobDist = Math.min(dist, maxRadius);
+
+                        joystickMoveKnob.style.transform = `translate(${Math.cos(angle) * knobDist}px, ${Math.sin(angle) * knobDist}px)`;
+                        touchMoveDir.x = Math.cos(angle);
+                        touchMoveDir.y = Math.sin(angle);
+                    }
+
+                    // Aim Joystick update
+                    if (touch.identifier === aimTouchId) {
+                        const dx = touch.clientX - aimStartX;
+                        const dy = touch.clientY - aimStartY;
+                        const dist = Math.hypot(dx, dy);
+                        const maxRadius = 45;
+                        const angle = Math.atan2(dy, dx);
+                        const knobDist = Math.min(dist, maxRadius);
+
+                        joystickAimKnob.style.transform = `translate(${Math.cos(angle) * knobDist}px, ${Math.sin(angle) * knobDist}px)`;
+                        touchAimDir.x = Math.cos(angle);
+                        touchAimDir.y = Math.sin(angle);
+                        isTouchAiming = true;
+                    }
+                }
+            }, { passive: true });
+
+            const handleTouchEnd = e => {
+                for (let touch of e.changedTouches) {
+                    if (touch.identifier === moveTouchId) {
+                        moveTouchId = null;
+                        joystickMoveKnob.style.transform = `translate(0px, 0px)`;
+                        touchMoveDir = { x: 0, y: 0 };
+                    }
+                    if (touch.identifier === aimTouchId) {
+                        aimTouchId = null;
+                        joystickAimKnob.style.transform = `translate(0px, 0px)`;
+                        touchAimDir = { x: 0, y: 0 };
+                        isTouchAiming = false;
+                    }
+                }
+            };
+
+            window.addEventListener('touchend', handleTouchEnd);
+            window.addEventListener('touchcancel', handleTouchEnd);
         }
 
         function broadcastState() {
@@ -1164,71 +1292,6 @@
         window.addEventListener('mouseup', () => {
             mouse.down = false;
         });
-
-        // --- TOUCH CONTROLS (MOBILE SUPPORT) ---
-        const joystickContainer = document.getElementById('joystickMove');
-        const joystickKnob = document.getElementById('joystickMoveKnob');
-
-        if ('ontouchstart' in window) {
-            isTouchDevice = true;
-            document.getElementById('mobileControls').classList.remove('hidden');
-
-            let touchId = null;
-            let startX = 0, startY = 0;
-
-            joystickContainer.addEventListener('touchstart', e => {
-                const touch = e.changedTouches[0];
-                touchId = touch.identifier;
-                const rect = joystickContainer.getBoundingClientRect();
-                startX = rect.left + rect.width / 2;
-                startY = rect.top + rect.height / 2;
-            });
-
-            window.addEventListener('touchmove', e => {
-                for (let touch of e.changedTouches) {
-                    if (touch.identifier === touchId) {
-                        const dx = touch.clientX - startX;
-                        const dy = touch.clientY - startY;
-                        const dist = Math.hypot(dx, dy);
-                        const maxRadius = 40;
-                        const angle = Math.atan2(dy, dx);
-
-                        const knobDist = Math.min(dist, maxRadius);
-                        joystickKnob.style.transform = `translate(${Math.cos(angle) * knobDist}px, ${Math.sin(angle) * knobDist}px)`;
-
-                        touchMoveDir.x = Math.cos(angle);
-                        touchMoveDir.y = Math.sin(angle);
-
-                        if (localPlayer) localPlayer.angle = angle;
-                    }
-                }
-            });
-
-            const resetJoystick = e => {
-                for (let touch of e.changedTouches) {
-                    if (touch.identifier === touchId) {
-                        touchId = null;
-                        joystickKnob.style.transform = `translate(0px, 0px)`;
-                        touchMoveDir = { x: 0, y: 0 };
-                    }
-                }
-            };
-
-            window.addEventListener('touchend', resetJoystick);
-            window.addEventListener('touchcancel', resetJoystick);
-
-            // Mobile Fire Button
-            const btnFire = document.getElementById('btnMobileFire');
-            btnFire.addEventListener('touchstart', e => {
-                e.preventDefault();
-                sfx.init();
-                mouse.down = true;
-            });
-            btnFire.addEventListener('touchend', e => {
-                e.preventDefault();
-                mouse.down = false;
-            });
-        }
 
         // --- MENU INTERACTION LOGIC ---
         function startGame(playerName) {
